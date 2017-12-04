@@ -1,0 +1,153 @@
+---
+title: 'Peer-graded Assignment: Course Project 1'
+author: "Gabriel Paredes"
+output:
+  html_document:
+    df_print: paged
+editor_options:
+  chunk_output_type: console
+---
+
+### 1. Code for reading in the dataset and/or processing the data
+
+Loading libraries for the analisys
+
+```{r libraryLoad, echo=TRUE}
+library(ggplot2)
+library(lubridate)
+library(dplyr)
+```
+
+Reading activity data and transforming colum date to date format
+```{r readDat, aecho=TRUE}
+unzip("activity.zip")
+activity <- read.csv("activity.csv", stringsAsFactors = FALSE)
+activity$date <- ymd(activity$date)
+```
+
+### 2. Histogram of the total number of steps taken each day
+
+Constructs the Histogram
+```{r plotHistogram, fig.align='center', echo=TRUE}
+totalSteps <- activity %>% group_by(date) %>% summarise(Steps = sum(steps))
+
+qplot(x = Steps, 
+      data = totalSteps,
+      geom = "histogram",
+      bins = 5,
+      col = I("black"), 
+      alpha = 0.8,
+      ylab = "Frequency", 
+      xlab = "Steps/Day", 
+      main = "Histogram total number of steps taken per day (5 bins)")
+```
+
+### 3.Calculate and report the mean and median of the total number of steps taken per day
+
+```{r meanTotalSteps, echo=TRUE}
+mean(totalSteps$Steps, na.rm = TRUE)
+```
+
+```{r medianTotalSteps, echo=TRUE}
+median(totalSteps$Steps, na.rm = TRUE)
+```
+
+### 4. Time series plot of the average number of steps taken
+
+```{r meanIntervalSteps, fig.align='center', echo=TRUE}
+averageIntervalStep <- activity %>% group_by(interval) %>% summarise(Steps = mean(steps, na.rm = TRUE))
+
+qplot(x = interval,
+      y = Steps,
+      data = averageIntervalStep,
+      geom = "line",
+      ylab = "Steps",
+      xlab = "5 Minute Interval",
+      main = "Average number of steps taken across all days"
+      )
+```
+
+### 5. The 5-minute interval that, on average, contains the maximum number of steps
+
+```{r maxInterval, echo=TRUE}
+maxIntervalIndex <- which.max(averageIntervalStep$Steps)
+maxInterval <- averageIntervalStep[maxIntervalIndex, ]
+print(maxInterval)
+```
+
+The **`r maxInterval[[1, 1]]`** 5-minute interval, on average across all the days in the dataset, contains **`r maxInterval[[1, 2]]`** steps
+
+### 6. Code to describe and show a strategy for imputing missing data
+
+Total number of missing values in the dataset
+```{r totalMissing, echo=TRUE}
+missingIndex <- which(is.na(activity$steps))
+length(missingIndex)
+```
+
+The missing values in the dataset are goin to be replaced with the mean for that 5-minute interval
+
+```{r replaceNA, echo=TRUE}
+fillActivity <- activity
+
+for (i in missingIndex) {
+    if (is.na(fillActivity$steps[i])) {
+        imputedValue <- averageIntervalStep %>% filter(interval == fillActivity$interval[i]) %>% select(Steps)
+        fillActivity$steps[i] <- imputedValue[[1]]
+    }
+}
+```
+
+### 7. Histogram of the total number of steps taken each day after missing values are imputed
+
+Constructs the Histogram with the imputed values
+```{r plotHistogramFill, fig.align='center', echo=TRUE}
+totalStepsFill <- fillActivity %>% group_by(date) %>% summarise(Steps = sum(steps))
+
+qplot(x = Steps, 
+      data = totalStepsFill,
+      geom = "histogram",
+      bins = 5,
+      col = I("black"), 
+      alpha = 0.8,
+      ylab = "Frequency", 
+      xlab = "Steps/Day", 
+      main = "Histogram total number of steps taken per day (5 bins) with imputed values")
+```
+
+Mean Total Steps per Day with imputed values
+```{r meanTotalStepsFill, echo=TRUE}
+mean(totalStepsFill$Steps)
+```
+
+Median Total Steps per Day with imputed values
+```{r medianTotalStepsFill, echo=TRUE}
+median(totalStepsFill$Steps)
+```
+
+The **mean** and **median** for the imputed values differs slightly from the original data set with the excluded NA values
+
+### 7. Panel plot comparing the average number of steps taken per 5-minute interval across weekdays and weekends
+
+Validates if the day is a weekday or a weekend
+```{r weekend}
+fillActivityDayType <- mutate(fillActivity, DayType = as.factor(ifelse(wday(date, label = TRUE) == "Sat" | wday(date, label = TRUE) == "Sun","Weekend", "Weekday")))
+```
+
+Panel plot containing a time series plot of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all weekday days or weekend days (y-axis)
+
+```{r pannelPlot, fig.align='center', echo=TRUE}
+averageIntervalStepDay <- fillActivityDayType %>% group_by(interval, DayType) %>% summarise(Steps = mean(steps))
+
+qplot(x = interval,
+      y = Steps,
+      data = averageIntervalStepDay,
+      geom = "line",
+      ylab = "Steps",
+      xlab = "5 Minute Interval",
+      main = "Average number of steps taken across all days by Day Type",
+      facets =  DayType ~ .,
+      color = DayType
+      )
+```
+
